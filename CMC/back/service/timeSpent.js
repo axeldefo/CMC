@@ -1,5 +1,5 @@
-// Fonction pour calculer le temps de rédaction par utilisateur
-exports.calculateWritingTimeByUser = (data) => {
+// Fonction pour calculer le temps de rédaction par utilisateur par jour
+exports.calculateWritingTimeByUser = (users, data) => {
 
     const writingTimes = {};
 
@@ -8,18 +8,19 @@ exports.calculateWritingTimeByUser = (data) => {
         const user = operation.User.Name;
         const actionTitle = operation.Action.Title;
         const delay = operation.Action.Delai;
+        const actionDate = new Date(operation.Action.Date).toISOString().split('T')[0]; // Format "YYYY-MM-DD"
 
-        // Vérifier si l'action correspond à une écriture (répondre, poster, citer)
-        if (["Repondre a un message", "Poster un nouveau message", "Citer un message"].includes(actionTitle)) {
+        if (users.includes(user) && ["Repondre a un message", "Poster un nouveau message", "Citer un message"].includes(actionTitle)) {
             if (delay) {
-                // Convertir la durée en secondes
-                const delayParts = delay.split(':');
-                const delayInSeconds = (+delayParts[0] * 3600) + (+delayParts[1] * 60) + (+delayParts[2]);
+                const delayInSeconds = parseTimeToSeconds(delay);
 
                 if (!writingTimes[user]) {
-                    writingTimes[user] = [];
+                    writingTimes[user] = {};
                 }
-                writingTimes[user].push(delayInSeconds);  // Ajouter le délai en secondes pour l'utilisateur
+                if (!writingTimes[user][actionDate]) {
+                    writingTimes[user][actionDate] = 0;
+                }
+                writingTimes[user][actionDate] += delayInSeconds; // Add delay in seconds for the user per day
             }
         }
     });
@@ -27,20 +28,8 @@ exports.calculateWritingTimeByUser = (data) => {
     return writingTimes;
 };
 
-
-// Fonction pour calculer la moyenne des temps de rédaction pour tous les utilisateurs
-exports.calculateOverallAverageWritingTime = () => {
-    const averageWritingTimes = exports.calculateAverageWritingTimeByUser();  // Récupérer la moyenne par utilisateur
-
-    const allTimes = Object.values(averageWritingTimes);
-
-    const totalAverageTime = allTimes.reduce((sum, time) => sum + time, 0) / allTimes.length;  // Calculer la moyenne globale
-
-    return totalAverageTime;
-};
-
-// Fonction pour calculer le temps d'affichage par utilisateur
-exports.calculateReadingTimeByUser = (data) => {
+// Fonction pour calculer le temps de lecture par utilisateur par jour
+exports.calculateReadingTimeByUser = (users, data) => {
 
     const readingTimes = {};
 
@@ -49,26 +38,28 @@ exports.calculateReadingTimeByUser = (data) => {
         const user = operation.User.Name;
         const title = operation.Action.Title;
         const delay = operation.Action.Delai;
+        const actionDate = new Date(operation.Action.Date).toISOString().split('T')[0]; // Format "YYYY-MM-DD"
 
-        // Vérifier si le titre correspond à "Afficher le fil de discussion" ou "Afficher le contenu d'un message"
-        if (title === "Afficher le fil de discussion" || title === "Afficher le contenu d'un message") {
+        if (users.includes(user) && (title === "Afficher le fil de discussion" || title === "Afficher le contenu d'un message")) {
             if (delay) {
-                const timeInSeconds = parseTimeToSeconds(delay); // Convertir le délai en secondes
+                const timeInSeconds = parseTimeToSeconds(delay);
 
                 if (!readingTimes[user]) {
-                    readingTimes[user] = 0; // Initialiser le compteur pour l'utilisateur
+                    readingTimes[user] = {};
                 }
-
-                readingTimes[user] += timeInSeconds; // Ajouter le temps de lecture
+                if (!readingTimes[user][actionDate]) {
+                    readingTimes[user][actionDate] = 0;
+                }
+                readingTimes[user][actionDate] += timeInSeconds; // Add reading time for the user per day
             }
         }
     });
 
-    return readingTimes; // Retourner le temps de lecture par utilisateur
+    return readingTimes;
 };
 
-// Fonction pour calculer le temps de scroll par utilisateur
-exports.calculateScrollTimeByUser = (data) => {
+// Fonction pour calculer le temps de scroll par utilisateur par jour
+exports.calculateScrollTimeByUser = (users, data) => {
 
     const scrollTimes = {};
 
@@ -77,57 +68,34 @@ exports.calculateScrollTimeByUser = (data) => {
         const user = operation.User.Name;
         const title = operation.Action.Title;
         const refTran = operation.Action.RefTran;
+        const actionDate = new Date(operation.Action.Date).toISOString().split('T')[0]; // Format "YYYY-MM-DD"
 
-        // Vérifier si le titre correspond à "Bouger la Scrollbar"
-        if (title === "Bouger la Scrollbar") {
-            const relatedOperations = data.filter(op => op.Operation.Action.RefTran === refTran);
+        // Vérifier que l'utilisateur est dans la liste des utilisateurs spécifiés
+        if (users.includes(user) && title.includes("Bouger la Scrollbar")) {
+            // Récupérer toutes les opérations ayant le même RefTran pour le même utilisateur
+            const relatedOperations = data.filter(op => 
+                op.Operation.Action.RefTran === refTran && 
+                op.Operation.User.Name === user
+            );
 
-            // Trouver les dates des opérations avec le même RefTran
-            const minDate = Math.min(...relatedOperations.map(op => new Date(op.Operation.Action.Date).getTime()));
-            const maxDate = Math.max(...relatedOperations.map(op => new Date(op.Operation.Action.Date).getTime()));
+            // Trouver la date de début et de fin pour ces opérations
+            const dateDebut = Math.min(...relatedOperations.map(op => new Date(op.Operation.Action.Date).getTime()));
+            const dateFin = Math.max(...relatedOperations.map(op => new Date(op.Operation.Action.Date).getTime()));
+            const scrollTimeInSeconds = (dateFin - dateDebut) / 1000;
 
-            const scrollTimeInSeconds = (maxDate - minDate) / 1000; // Calculer le temps de scroll en secondes
-
+            // Initialiser l'objet utilisateur et la date si nécessaires
             if (!scrollTimes[user]) {
-                scrollTimes[user] = 0; // Initialiser le compteur pour l'utilisateur
+                scrollTimes[user] = {};
             }
-
-            scrollTimes[user] += scrollTimeInSeconds; // Ajouter le temps de scroll
+            if (!scrollTimes[user][actionDate]) {
+                scrollTimes[user][actionDate] = 0;
+            }
+            // Ajouter le temps de scroll pour l'utilisateur par jour
+            scrollTimes[user][actionDate] += scrollTimeInSeconds;
         }
     });
 
-    return scrollTimes; // Retourner le temps de scroll par utilisateur
-};
-
-// Fonction pour calculer le temps moyen de lecture
-exports.calculateAverageReadingTime = () => {
-    const readingTimes = this.calculateReadingTimeByUser();
-    const scrollTimes = this.calculateScrollTimeByUser();
-
-    const totalTimes = {};
-
-    // Combiner les temps de lecture et de scroll pour chaque utilisateur
-    for (const user in readingTimes) {
-        if (!totalTimes[user]) {
-            totalTimes[user] = 0;
-        }
-        totalTimes[user] += readingTimes[user];
-    }
-
-    for (const user in scrollTimes) {
-        if (!totalTimes[user]) {
-            totalTimes[user] = 0;
-        }
-        totalTimes[user] += scrollTimes[user];
-    }
-
-    // Calculer la moyenne du temps de lecture
-    const totalReadingTime = Object.values(totalTimes).reduce((acc, curr) => acc + curr, 0);
-    const userCount = Object.keys(totalTimes).length;
-
-    const averageReadingTime = totalReadingTime / userCount;
-
-    return averageReadingTime; // Retourner la moyenne du temps de lecture
+    return scrollTimes;
 };
 
 // Fonction utilitaire pour convertir le temps (hh:mm:ss) en secondes
