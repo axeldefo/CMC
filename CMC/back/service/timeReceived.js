@@ -107,6 +107,7 @@ exports.calculateReadingTimeReceivedByUser = (users, data) => {
 exports.calculateScrollTimeReceivedByUser = (users, data) => {
     const scrollTimeReceivedByUser = {};
     const messageSentByUser = {};
+    const processedRefTran = new Set(); // Stocker les RefTran traités pour chaque date
 
     // Étape 1 : Identifier les messages envoyés par chaque utilisateur et initialiser les objets de lecture
     data.forEach(item => {
@@ -115,7 +116,7 @@ exports.calculateScrollTimeReceivedByUser = (users, data) => {
         const title = operation.Action.Title;
         const messageId = operation.Message.id;
         const sender = operation.Message.Sender; // Récupérer le sender directement
-        const actionDate = new Date(operation.Action.Date).toISOString().split('T')[0]; // Format "YYYY-MM-DD"
+        const actionDate = new Date(operation.Action.Date).toLocaleDateString('en-CA'); // Format "YYYY-MM-DD"
 
         // Si l'action est l'envoi d'un message, l'enregistrer sous l'utilisateur
         if (users.includes(user) && (title === "Repondre a un message" || title === "Citer un message" || title === "Poster un nouveau message")) {
@@ -132,31 +133,38 @@ exports.calculateScrollTimeReceivedByUser = (users, data) => {
         const scrollerUser = operation.User.Name; // User who is scrolling
         const title = operation.Action.Title;
         const refTran = operation.Action.RefTran;
-        const actionDate = new Date(operation.Action.Date).toISOString().split('T')[0]; // Format "YYYY-MM-DD"
+        const actionDate = new Date(operation.Action.Date).toLocaleDateString('en-CA'); // Format "YYYY-MM-DD"
 
         // Vérifier si l'action est "Bouger la Scrollbar"
-        if (title.includes("Bouger la Scrollbar")) {
-            // Trouver le message correspondant en utilisant le RefTran
-            const relatedMessage = data.find(op => op.Operation.Action.RefTran === refTran);
-            if (relatedMessage) {
-                const senderUser = relatedMessage.Operation.Message.Sender; // Récupérer l'expéditeur
+        if (title.includes("Bouger la ScrollBar")) {
 
-                // Assurer que le scroller n'est pas le même que l'expéditeur du message
-                if (senderUser && senderUser !== scrollerUser) {
-                    // Trouver les dates min et max des opérations liées
-                    const relatedOperations = data.filter(op => op.Operation.Action.RefTran === refTran);
-                    const dateDebut = Math.min(...relatedOperations.map(op => new Date(op.Operation.Action.Date).getTime()));
-                    const dateFin = Math.max(...relatedOperations.map(op => new Date(op.Operation.Action.Date).getTime()));
-                    const scrollTimeInSeconds = (dateFin - dateDebut) / 1000;
+            // Vérifier si le RefTran a déjà été traité pour la date actuelle
+            if (!processedRefTran.has(refTran)) {
+                // Trouver le message correspondant en utilisant le RefTran
+                const relatedMessage = data.find(op => op.Operation.Action.RefTran === refTran);
+                if (relatedMessage) {
+                    const senderUser = relatedMessage.Operation.Message.Sender; // Récupérer l'expéditeur
 
-                    if (!scrollTimeReceivedByUser[senderUser]) {
-                        scrollTimeReceivedByUser[senderUser] = {};
+                    // Assurer que le scroller n'est pas le même que l'expéditeur du message
+                    if (senderUser && senderUser !== scrollerUser) {
+                        // Trouver les dates min et max des opérations liées
+                        const relatedOperations = data.filter(op => op.Operation.Action.RefTran === refTran);
+                        const dateDebut = Math.min(...relatedOperations.map(op => new Date(op.Operation.Action.Date).getTime()));
+                        const dateFin = Math.max(...relatedOperations.map(op => new Date(op.Operation.Action.Date).getTime()));
+                        const scrollTimeInSeconds = (dateFin - dateDebut) / 1000;
+
+                        if (!scrollTimeReceivedByUser[senderUser]) {
+                            scrollTimeReceivedByUser[senderUser] = {};
+                        }
+                        if (!scrollTimeReceivedByUser[senderUser][actionDate]) {
+                            scrollTimeReceivedByUser[senderUser][actionDate] = 0;
+                        }
+                        scrollTimeReceivedByUser[senderUser][actionDate] += scrollTimeInSeconds; // Add scroll time for the user per day
                     }
-                    if (!scrollTimeReceivedByUser[senderUser][actionDate]) {
-                        scrollTimeReceivedByUser[senderUser][actionDate] = 0;
-                    }
-                    scrollTimeReceivedByUser[senderUser][actionDate] += scrollTimeInSeconds; // Add scroll time for the user per day
                 }
+
+                // Ajouter le RefTran à la liste des RefTran traités pour la date actuelle
+                processedRefTran.add(refTran);
             }
         }
     });

@@ -1,0 +1,40 @@
+/* Add this to your CSS file */
+.flex {
+    display: flex;
+}
+
+.items-center {
+    align-items: center;
+}
+
+.justify-center {
+    justify-content: center;
+}
+
+.h-screen {
+    height: 100vh;
+    margin: 3rem auto;
+    margin-bottom: 8rem;
+}
+
+.mb-4 {
+    margin-bottom: 1rem; /* Adjust spacing as needed */
+}
+
+.ml-4 {
+    margin-left: 1rem; /* Adjust spacing as needed */
+}
+
+.mr-2 {
+    margin-right: 0.5rem; /* Adjust spacing as needed */
+}
+
+.text-3xl {
+    font-size: 2rem; /* Adjust to your font size scale */
+}
+
+.w-250px {
+    width: 200px; /* Set width for select */
+}
+
+/* You may add additional styling as needed for better aesthetics */

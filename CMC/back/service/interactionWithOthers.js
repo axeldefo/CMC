@@ -98,3 +98,81 @@ exports.countUniqueAuthorsUserInteractedWith = (users, data) => {
     return uniqueAuthorsCount;  // Retourner le nombre d'auteurs uniques par utilisateur par jour
 };
 
+// Fonction pour compter les réponses ou citations immédiatement après la lecture d'un message par utilisateur par jour
+exports.countResponseAfterReading = (users, data) => {
+    let responseCountsByDay = {};
+
+    data.forEach(item => {
+        const operation = item.Operation;
+        const user = operation.User.Name;
+        const title = operation.Action.Title;
+        const refTran = operation.Action.RefTran;
+        const messageId = operation.Message.id;
+
+        // Vérifier si l'utilisateur est dans la liste et que l'action est une lecture
+        if (users.includes(user) && (title === "Afficher le contenu d'un message" || title === "Bouger la ScrollBar")) {
+            if (refTran === 0 && title === "Afficher le contenu d'un message") {
+                const readingDate = new Date(operation.Action.Date);
+                const readingTimeInSeconds = readingDate.getTime() / 1000; // Convertir l'heure en secondes
+
+                // Trouver la prochaine action après la lecture
+                const nextAction = data.find(op => 
+                    op.Operation.User.Name === user &&
+                    new Date(op.Operation.Action.Date).getTime() / 1000 > readingTimeInSeconds // Action suivante
+                );
+
+                if (nextAction) {
+                    const nextTitle = nextAction.Operation.Action.Title;
+                    const parentMessageId = nextAction.Operation.Message.Attributes.idParent;
+                    const nextActionDate = new Date(nextAction.Operation.Action.Date).toISOString().split('T')[0]; // Date au format YYYY-MM-DD
+
+                    // Vérifier si la prochaine action est une réponse ou citation du même message
+                    if ((nextTitle === "Repondre a un message" || nextTitle === "Citer un message") &&
+                        parentMessageId === messageId) {
+
+                        if (!responseCountsByDay[user]) responseCountsByDay[user] = {};
+                        if (!responseCountsByDay[user][nextActionDate]) responseCountsByDay[user][nextActionDate] = 0;
+                        responseCountsByDay[user][nextActionDate] += 1;
+                    }
+                }
+            }
+
+            // Cas où l'action est un défilement (scroll)
+            if (refTran !== 0 && title === "Bouger la ScrollBar") {
+                // Filtrer les opérations ayant le même refTran, ID de message, et nom de l'utilisateur
+                const relatedOperations = data.filter(op => 
+                    op.Operation.Action.RefTran === refTran && 
+                    op.Operation.User.Name === user &&
+                    op.Operation.Message.id === messageId
+                );
+
+                // Trouver la dernière action de lecture pour cet utilisateur et message
+                const latestReadingAction = Math.max(...relatedOperations.map(op => new Date(op.Operation.Action.Date).getTime()));
+
+                // Trouver la prochaine action de l'utilisateur après cette lecture
+                const nextAction = data.find(op => 
+                    op.Operation.User.Name === user &&
+                    new Date(op.Operation.Action.Date).getTime() > latestReadingAction
+                );
+
+                if (nextAction) {
+                    const nextTitle = nextAction.Operation.Action.Title;
+                    const parentMessageId = nextAction.Operation.Message.Attributes.idParent;
+                    const nextActionDate = new Date(nextAction.Operation.Action.Date).toISOString().split('T')[0]; // Date au format YYYY-MM-DD
+
+                    // Vérifier si la prochaine action est une réponse ou citation du même message
+                    if ((nextTitle === "Repondre a un message" || nextTitle === "Citer un message") &&
+                        parentMessageId === messageId) {
+
+                        if (!responseCountsByDay[user]) responseCountsByDay[user] = {};
+                        if (!responseCountsByDay[user][nextActionDate]) responseCountsByDay[user][nextActionDate] = 0;
+                        responseCountsByDay[user][nextActionDate] += 1;
+                    }
+                }
+            }
+        }
+    });
+
+    return responseCountsByDay;
+};
+

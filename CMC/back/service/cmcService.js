@@ -33,8 +33,23 @@ const getMinMaxDates = (data) => {
     };
 };
 
+// Function to get default start and end dates and the list of all forums
+exports.defaultData = () => {
+    const data = loadData(); // Load your data from the appropriate source
+    const { minDate, maxDate } = getMinMaxDates(data); // Get the min and max dates
+
+    // Extract unique forum names while filtering out empty strings
+    const forums = [...new Set(data
+        .map(item => item.Operation.Message.Attributes.Forum)
+        .filter(forum => forum.trim() !== "") // Remove empty strings
+    )];
+    return { minDate, maxDate, forums }; // Return the results
+};
+
+
 //Nombre de points pour les interactions générées par utilisateur par jour à partir de load data, pour tous les utilisateurs et de la date de début à la date de fin
-exports.pointsForGeneratedInteractions = (startDateStr = null, endDateStr = null) => {
+exports.pointsForGeneratedInteractions = (startDateStr = null, endDateStr = null, forum) => {
+    
     
     const data = loadData();
     
@@ -45,12 +60,12 @@ exports.pointsForGeneratedInteractions = (startDateStr = null, endDateStr = null
     const endDate = endDateStr ? parseDate(endDateStr) : maxDate;
 
     const users = allUsers(data);
-    const points = calculatePointsForGeneratedInteractions(users, data, startDate, endDate);
+    const points = calculatePointsForGeneratedInteractions(users, data, startDate, endDate, forum);
     return points;
 }
 
 //Nombre de points pour les interactions avec les autres par utilisateur par jour à partir de load data, pour tous les utilisateurs et de la date de début à la date de fin
-exports.pointsForInteractionsWithOthers = (startDateStr = null, endDateStr = null) => {
+exports.pointsForInteractionsWithOthers = (startDateStr = null, endDateStr = null, forum) => {
     const data = loadData();
     
     const { minDate, maxDate } = getMinMaxDates(data);
@@ -61,12 +76,12 @@ exports.pointsForInteractionsWithOthers = (startDateStr = null, endDateStr = nul
 
 
     const users = allUsers(data);
-    const points = calculatePointsForInteractionsWithOthers(users, data, startDate, endDate);
+    const points = calculatePointsForInteractionsWithOthers(users, data, startDate, endDate, forum);
     return points;
 }
 
 //Nombre de points pour le temps passé par utilisateur par jour à partir de load data, pour tous les utilisateurs et de la date de début à la date de fin
-exports.pointsForTimeSpent = (startDateStr = null, endDateStr = null) => {
+exports.pointsForTimeSpent = (startDateStr = null, endDateStr = null, forum = null) => {
     const data = loadData();
     
     const { minDate, maxDate } = getMinMaxDates(data);
@@ -77,12 +92,12 @@ exports.pointsForTimeSpent = (startDateStr = null, endDateStr = null) => {
 
 
     const users = allUsers(data);
-    const points = calculatePointsForTimeSpent(users, data, startDate, endDate);
+    const points = calculatePointsForTimeSpent(users, data, startDate, endDate, forum);
     return points;
 }
 
 //Nombre de points pour le temps reçu par utilisateur par jour à partir de load data, pour tous les utilisateurs et de la date de début à la date de fin
-exports.pointsForTimeReceived = (startDateStr = null, endDateStr = null) => {
+exports.pointsForTimeReceived = (startDateStr = null, endDateStr = null, forum) => {
     const data = loadData();
     
     const { minDate, maxDate } = getMinMaxDates(data);
@@ -93,16 +108,18 @@ exports.pointsForTimeReceived = (startDateStr = null, endDateStr = null) => {
 
 
     const users = allUsers(data);
-    const points = calculatePointsForTimeReceived(users, data, startDate, endDate);
+    const points = calculatePointsForTimeReceived(users, data, startDate, endDate, forum);
     return points;
 }
 
 // Nombre de points total par utilisateur par jour à partir de load data, pour un utilisateur et de la date de début à la date de fin
-exports.totalPoints = (startDate = null, endDate = null) => {
-    const generatedPoints = this.pointsForGeneratedInteractions(startDate, endDate);
-    const interactionPoints = this.pointsForInteractionsWithOthers(startDate, endDate);
-    const timeSpentPoints = this.pointsForTimeSpent(startDate, endDate);
-    const timeReceivedPoints = this.pointsForTimeReceived(startDate, endDate);
+exports.totalPoints = (startDate = null, endDate = null, forum) => {
+
+
+    const generatedPoints = this.pointsForGeneratedInteractions(startDate, endDate, forum);
+    const interactionPoints = this.pointsForInteractionsWithOthers(startDate, endDate, forum);
+    const timeSpentPoints = this.pointsForTimeSpent(startDate, endDate, forum);
+    const timeReceivedPoints = this.pointsForTimeReceived(startDate, endDate, forum);
 
     // Créer un objet pour stocker les points totaux
     const totalPoints = {};
