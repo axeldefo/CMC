@@ -6,43 +6,16 @@ const { calculateWritingTimeByOthersForUser, calculateReadingTimeReceivedByUser,
 // Fonction utilitaire pour convertir une date en format standard (AAAA-MM-JJ HH:MM:SS) en objet Date
 const parseDate = (dateStr) => new Date(dateStr);
 
-// Fonction pour récupérer les données entre deux dates et pour un forum (Operations.Message.Forum) donné (si spécifié)
-const getFilteredData = (data, startDateStr, endDateStr, forum) => {
-    const startDate = parseDate(startDateStr);
-    const endDate = parseDate(endDateStr);
 
-    const filteredData = data.filter(item => {
-        const actionDate = parseDate(item.Operation.Action.Date);
-        
-        // Convert forum to a number for comparison
-        const forumMatch = (forum && forum !== "") ? parseInt(item.Operation.Message.Attributes.Forum) === parseInt(forum) : true;
-
-        // Check if actionDate is within the date range and forum matches
-        return actionDate >= startDate && actionDate <= endDate && forumMatch;
-    });
-    return filteredData;
-};
 
 
 // Fonction pour calculer les points correspondant aux interactions générées par user par jour sur une période donnée
-exports.calculatePointsForGeneratedInteractions = (users, data, startDate, endDate, forum) => {
+exports.calculatePointsForGeneratedInteractions = (users, data, dateList) => {
 
-    // Filtrer les données en fonction de la période
-    const filteredData = getFilteredData(data, startDate, endDate, forum);
-
-    const interactionsData = countInteractionsAndDownloadsForUser(users, filteredData);  // Appeler avec la liste des utilisateurs
-    const uniqueInteractorsData = countUniqueInteractorsForUsersAsSender(users, filteredData);  // Appeler avec la liste des utilisateurs
+    const interactionsData = countInteractionsAndDownloadsForUser(users, data);  // Appeler avec la liste des utilisateurs
+    const uniqueInteractorsData = countUniqueInteractorsForUsersAsSender(users, data);  // Appeler avec la liste des utilisateurs
 
     const result = {};
-
-    // Créer une liste de toutes les dates entre startDate et endDate
-    const currentDate = new Date(startDate);
-    const dateList = [];
-
-    while (currentDate <= endDate) {
-        dateList.push(currentDate.toISOString().split('T')[0]); // Format "YYYY-MM-DD"
-        currentDate.setDate(currentDate.getDate() + 1);
-    }
 
     // Calculer les points par utilisateur et par jour
     users.forEach(user => {
@@ -70,26 +43,15 @@ exports.calculatePointsForGeneratedInteractions = (users, data, startDate, endDa
 
 
 // Fonction pour calculer les points correspondant aux interactions d'un user avec les autres sur une période donnée 
-exports.calculatePointsForInteractionsWithOthers = (users, data, startDate, endDate, forum) => {
-    // Filtrer les données en fonction de la période
-    const filteredData = getFilteredData(data, startDate, endDate, forum);
+exports.calculatePointsForInteractionsWithOthers = (users, data, dateList) => {
 
     // Appeler les fonctions en passant la liste complète des utilisateurs
-    const postsData = countPostsByUser(users, filteredData);
-    const uniqueAuthorsData = countUniqueAuthorsUserInteractedWith(users, filteredData);
-    const responseData = countInteractionsByUser(users, filteredData);
-    const responseAfterReadingData = countResponseAfterReading(users, filteredData);
+    const postsData = countPostsByUser(users, data);
+    const uniqueAuthorsData = countUniqueAuthorsUserInteractedWith(users, data);
+    const responseData = countInteractionsByUser(users, data);
+    const responseAfterReadingData = countResponseAfterReading(users, data);
     
     const result = {};
-
-    // Créer une liste de toutes les dates entre startDate et endDate
-    const currentDate = new Date(startDate);
-    const dateList = [];
-
-    while (currentDate <= endDate) {
-        dateList.push(currentDate.toISOString().split('T')[0]); // Format "YYYY-MM-DD"
-        currentDate.setDate(currentDate.getDate() + 1);
-    }
 
     // Initialiser le résultat pour chaque utilisateur et chaque date
     users.forEach(user => {
@@ -119,24 +81,13 @@ exports.calculatePointsForInteractionsWithOthers = (users, data, startDate, endD
 
 // Fonction pour calculer les points correspondant au temps que l'utilisateur consacre aux autres 
 // 1 point pour chaque 10% de plus que la moyenne pour le temps de rédaction, lecture et scroll et 1 point pour chaque 10% de moins que la médiane pour le temps entre lecture et réponse
-exports.calculatePointsForTimeSpent = (users, data, startDate, endDate, forum) => {
-
-    // Créer une liste de toutes les dates entre startDate et endDate
-    const dateList = [];
-    const currentDate = new Date(startDate);
-    while (currentDate <= endDate) {
-        dateList.push(currentDate.toISOString().split('T')[0]); // Format "YYYY-MM-DD"
-        currentDate.setDate(currentDate.getDate() + 1);
-    }
-
-    // Filtrer les données en fonction de la période
-    const filteredData = getFilteredData(data, startDate, endDate, forum);
+exports.calculatePointsForTimeSpent = (users, data, dateList) => {
 
     // Calculer les temps d'écriture, de lecture et de scroll pour tous les utilisateurs
-    const writingTimes = calculateWritingTimeByUser(users, filteredData);
-    const readingTimes = calculateReadingTimeByUser(users, filteredData);
-    const scrollTimes = calculateScrollTimeByUser(users, filteredData);
-    const timeBetweenReadingAndRespondingData = timeBetweenReadingAndResponding(users, filteredData);
+    const writingTimes = calculateWritingTimeByUser(users, data);
+    const readingTimes = calculateReadingTimeByUser(users, data);
+    const scrollTimes = calculateScrollTimeByUser(users, data);
+    const timeBetweenReadingAndRespondingData = timeBetweenReadingAndResponding(users, data);
 
     // Calculer la limite pour la comparaison du temps entre la lecture et la réponse
     const limitTimeBetweenReadingAndResponding = 1000;
@@ -188,23 +139,12 @@ exports.calculatePointsForTimeSpent = (users, data, startDate, endDate, forum) =
 
 // Fonction pour calculer les points correspondant au temps que l'utilisateur reçoit des autres 
 // 1 point pour chaque 10% de la moyenne en plus de la moyenne pour le temps de rédaction, lecture et scroll
-exports.calculatePointsForTimeReceived = (users, data, startDate, endDate, forum) => {
-
-    // Filtrer les données en fonction de la période
-    const filteredData = getFilteredData(data, startDate, endDate, forum);
-
-    // Créer une liste de toutes les dates entre startDate et endDate
-    const dateList = [];
-    const currentDate = new Date(startDate);
-    while (currentDate <= endDate) {
-        dateList.push(currentDate.toISOString().split('T')[0]); // Format "YYYY-MM-DD"
-        currentDate.setDate(currentDate.getDate() + 1);
-    }
+exports.calculatePointsForTimeReceived = (users, data, dateList) => {
 
     // Calculer les temps de rédaction, lecture et scroll reçus pour tous les utilisateurs
-    const writingTimes = calculateWritingTimeByOthersForUser(users, filteredData);
-    const readingTimes = calculateReadingTimeReceivedByUser(users, filteredData);
-    const scrollTimes = calculateScrollTimeReceivedByUser(users, filteredData);
+    const writingTimes = calculateWritingTimeByOthersForUser(users, data);
+    const readingTimes = calculateReadingTimeReceivedByUser(users, data);
+    const scrollTimes = calculateScrollTimeReceivedByUser(users, data);
 
     // Calculer la moyenne globale sur toute la durée
     const totalWritingTime = Object.values(writingTimes).reduce((sum, times) => {

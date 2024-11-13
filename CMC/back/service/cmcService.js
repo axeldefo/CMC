@@ -4,7 +4,7 @@ const { calculatePointsForGeneratedInteractions, calculatePointsForInteractionsW
 
 // Load and parse JSON data only once
 const loadData = () => {
-    const jsonFilePath = path.join(__dirname, '../data/mdd.json');
+    const jsonFilePath = path.join(__dirname, '../data/modele.json');
     const jsonData = fs.readFileSync(jsonFilePath, 'utf-8');
     return JSON.parse(jsonData);
 };
@@ -37,6 +37,7 @@ const getMinMaxDates = () => {
 
 const { minDate, maxDate } = getMinMaxDates(); // Only calculate once
 
+
 // Extract unique forum names
 const getAllForums = () => [...new Set(data
     .map(item => item.Operation.Message.Attributes.Forum)
@@ -57,42 +58,86 @@ const getDateRange = (startDateStr, endDateStr) => {
     return { startDate, endDate };
 };
 
+// Fonction pour récupérer les données entre deux dates et pour un forum (Operations.Message.Forum) donné (si spécifié)
+const getFilteredData = (data, startDateStr = null, endDateStr = null, forum) => {
+
+    const { startDate, endDate } = getDateRange(startDateStr, endDateStr);
+
+    const filteredData = data.filter(item => {
+        const actionDate = parseDate(item.Operation.Action.Date);
+
+        // Convert forum to a number for comparison
+        const forumMatch = (forum && forum !== "") ? parseInt(item.Operation.Message.Attributes.Forum) === parseInt(forum) : true;
+
+        // Check if actionDate is within the date range and forum matches
+        return actionDate >= startDate && actionDate <= endDate && forumMatch;
+    });
+    return filteredData;
+};
+
+//creer une liste de toutes les dates entre startDate et endDate
+const getDateList = (startDateStr, endDateStr) => {
+    const { startDate, endDate } = getDateRange(startDateStr, endDateStr);
+    const dateList = [];
+    const currentDate = new Date(startDate);
+    while (currentDate <= endDate) {
+        dateList.push(currentDate.toISOString().split('T')[0]); // Format "YYYY-MM-DD"
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+    return dateList;
+};
+
 // Calculate points for generated interactions
 exports.pointsForGeneratedInteractions = (startDateStr = null, endDateStr = null, forum) => {
-    const { startDate, endDate } = getDateRange(startDateStr, endDateStr);
+
+    const dateList = getDateList(startDateStr, endDateStr);
+
+    const filteredData = getFilteredData(data, startDateStr, endDateStr, forum);
+
     const users = allUsers();
-    return calculatePointsForGeneratedInteractions(users, data, startDate, endDate, forum);
+    return calculatePointsForGeneratedInteractions(users, filteredData, dateList);
 };
 
 // Calculate points for interactions with others
 exports.pointsForInteractionsWithOthers = (startDateStr = null, endDateStr = null, forum) => {
-    const { startDate, endDate } = getDateRange(startDateStr, endDateStr);
+    
+    const dateList = getDateList(startDateStr, endDateStr);
+
+    const filteredData = getFilteredData(data, startDateStr, endDateStr, forum);
+
     const users = allUsers();
-    return calculatePointsForInteractionsWithOthers(users, data, startDate, endDate, forum);
+    return calculatePointsForInteractionsWithOthers(users, filteredData, dateList);
 };
 
 // Calculate points for time spent
 exports.pointsForTimeSpent = (startDateStr = null, endDateStr = null, forum = null) => {
-    const { startDate, endDate } = getDateRange(startDateStr, endDateStr);
+
+    const dateList = getDateList(startDateStr, endDateStr);
+    
+    const filteredData = getFilteredData(data, startDateStr, endDateStr, forum);
+
     const users = allUsers();
-    return calculatePointsForTimeSpent(users, data, startDate, endDate, forum);
+    return calculatePointsForTimeSpent(users, filteredData, dateList);
 };
 
 // Calculate points for time received
 exports.pointsForTimeReceived = (startDateStr = null, endDateStr = null, forum) => {
-    const { startDate, endDate } = getDateRange(startDateStr, endDateStr);
+
+    const dateList = getDateList(startDateStr, endDateStr);
+
+    const filteredData = getFilteredData(data, startDateStr, endDateStr, forum);
+
     const users = allUsers();
-    return calculatePointsForTimeReceived(users, data, startDate, endDate, forum);
+    return calculatePointsForTimeReceived(users, filteredData, dateList);
 };
 
 // Calculate total points
 exports.totalPoints = (startDate = null, endDate = null, forum) => {
-    const { startDate: start, endDate: end } = getDateRange(startDate, endDate);
 
-    const generatedPoints = this.pointsForGeneratedInteractions(start, end, forum);
-    const interactionPoints = this.pointsForInteractionsWithOthers(start, end, forum);
-    const timeSpentPoints = this.pointsForTimeSpent(start, end, forum);
-    const timeReceivedPoints = this.pointsForTimeReceived(start, end, forum);
+    const generatedPoints = this.pointsForGeneratedInteractions(startDate, endDate, forum);
+    const interactionPoints = this.pointsForInteractionsWithOthers(startDate, endDate, forum);
+    const timeSpentPoints = this.pointsForTimeSpent(startDate, endDate, forum);
+    const timeReceivedPoints = this.pointsForTimeReceived(startDate, endDate, forum);
 
     const totalPoints = {};
     const allUsersSet = new Set([

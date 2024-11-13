@@ -14,8 +14,8 @@ exports.getDefault = async (req, res) => {
 //Api pour obtenir le nombre total de points pour une période donnée
 exports.getTotal = async (req, res) => {
     try {
-        
         const { startDate, endDate, forum } = req.query;
+        console.log(startDate, endDate, forum);
         const points = cmcService.totalPoints(startDate, endDate, forum);
         res.status(200).json(points);
         
