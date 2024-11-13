@@ -13,76 +13,83 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import "./Style.css"
+import "./Style.css";
 
 // Initialize the exporting module
 HighchartsExporting(Highcharts);
 
-export default function TimeReceived ({defaultStartDate, defaultEndDate, allForums}) {
-    const [startDate, setStartDate] = useState(defaultStartDate || '');
-    const [endDate, setEndDate] = useState(defaultEndDate || '');
+export default function TimeSpentByUser() {
+    const defaultData = {
+        minDate: "2009-02-12",
+        maxDate: "2009-05-15",
+        forums: [
+            "Tous", "7", "10", "14", "11", "9", "329", "331", "332",
+            "333", "330", "353", "354", "355", "13", "335", "336", "337",
+            "339", "340", "341", "338", "358", "359", "360", "343",
+            "344", "346", "347", "348", "362", "363", "16", "17", "326"
+        ]
+    };
+
+    const [startDate, setStartDate] = useState(defaultData.minDate);
+    const [endDate, setEndDate] = useState(defaultData.maxDate);
     const [forum, setForum] = useState('Tous');
-    const [generated, setGenerated] = useState({});
-    const [forums, setForums] = useState(allForums || []);
+    const [chartData, setChartData] = useState({});
+    const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
-        if (defaultStartDate && defaultEndDate && allForums) {
-            setStartDate(defaultStartDate);
-            setEndDate(defaultEndDate);
-            setForums(allForums);
-            handleWithOthers();
-        }
-    }, [defaultStartDate, defaultEndDate, allForums]);
+        setStartDate(defaultData.minDate);
+        setEndDate(defaultData.maxDate);
+        fetchChartData();
+    }, []);
 
-
-    const handleWithOthers = async () => {
+    const fetchChartData = async () => {
+        setIsLoading(true);
         const queryParams = new URLSearchParams({
             startDate: startDate || '',
             endDate: endDate || '',
-            forum: forum === 'Tous' ? '' : forum, // Set forum to null if "Tous" is selected
+            forum: forum === 'Tous' ? '' : forum,
         }).toString();
 
         try {
-            const response = await fetch(`/api/cmc/received?${queryParams}`, {
-                method : 'GET',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-              });
+            const response = await fetch(`api/cmc/received?${queryParams}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
             if (!response.ok) throw new Error(`Server error: ${response.status}`);
             const data = await response.json();
-            setGenerated(data);
+            setChartData(data);
         } catch (error) {
             console.error('Error:', error);
-            setGenerated({ error: "An error occurred while fetching data" });
+            setChartData({ error: "An error occurred while fetching data" });
+        } finally {
+            setIsLoading(false);
         }
     };
 
-
     const processChartData = () => {
-        if (Object.keys(generated).length === 0) return [];
+        if (Object.keys(chartData).length === 0) return [];
 
-        const userPoints = Object.entries(generated).map(([user, dates]) => ({
+        const usersData = Object.entries(chartData).map(([user, timeData]) => ({
             user,
-            totalPoints: Object.values(dates).reduce((sum, points) => sum + points, 0),
-            dates
+            totalTime: Object.values(timeData).reduce((sum, time) => sum + time, 0),
+            timeData
         }));
 
-        const topUsers = userPoints
-            .sort((a, b) => b.totalPoints - a.totalPoints)
+        const topUsers = usersData
+            .sort((a, b) => b.totalTime - a.totalTime)
             .slice(0, 5);
 
         return topUsers.map(user => ({
             name: user.user,
-            data: Object.entries(user.dates).map(([date, points]) => ({
+            data: Object.entries(user.timeData).map(([date, time]) => ({
                 x: new Date(date).getTime(),
-                y: points
+                y: time
             })),
             type: 'line'
         }));
     };
 
-    const options = {
+    const chartOptions = {
         chart: {
             zoomType: 'x',
             type: 'line',
@@ -90,18 +97,15 @@ export default function TimeReceived ({defaultStartDate, defaultEndDate, allForu
             height: 700
         },
         title: {
-            text: 'Time other people spent writing/reading the user',
-            style: {
-                fontSize: '0px', // Make the title larger
-            },
-            enabled: false
+            text: 'Time Reveived by Users on Writing/Reading',
+            style: { fontSize: '16px' }
         },
         xAxis: {
             type: 'datetime',
             title: { text: 'Date' }
         },
         yAxis: {
-            title: { text: 'Points per Day' }
+            title: { text: 'Time Received' }
         },
         tooltip: {
             shared: true,
@@ -115,32 +119,27 @@ export default function TimeReceived ({defaultStartDate, defaultEndDate, allForu
             verticalAlign: 'bottom'
         },
         exporting: {
+            enabled: true,
             buttons: {
                 contextButton: {
                     menuItems: [
                         'viewFullscreen',
-                        'separator',
                         'downloadPNG',
                         'downloadJPEG',
                         'downloadPDF',
                         'downloadSVG',
-                        'separator',
                         'downloadCSV',
                         'downloadXLS',
                         'viewData'
                     ]
                 }
-            },
-            enabled: true
+            }
         }
     };
 
-
     return (
-        <div className="flex flex-col items-center justify-center h-screen">
-            
-            <figure className="highcharts-figure" style={{ textAlign: 'center', padding: '20px' }}>
-                <h1 className="text-3xl mb-4">Time other people spent writing/reading the user</h1>
+        <div className="flex flex-col items-center justify-center h-screen" >
+            <h1 className="text-3xl mb-4">Time Received by Users on Writing/Reading</h1>
             <div className="flex items-center mb-4">
                 <label htmlFor="startDate" className="mr-2">Start Date:</label>
                 <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
@@ -154,19 +153,23 @@ export default function TimeReceived ({defaultStartDate, defaultEndDate, allForu
                     <SelectContent>
                         <SelectGroup>
                             <SelectLabel>Forums</SelectLabel>
-                            {forums.map(forumValue => (
-                                <SelectItem key={forumValue} value={forumValue}>
-                                    {forumValue}
+                            {defaultData.forums.map(f => (
+                                <SelectItem key={f} value={f}>
+                                    {f}
                                 </SelectItem>
                             ))}
                         </SelectGroup>
                     </SelectContent>
                 </Select>
-                <Button onClick={handleWithOthers} className="ml-4">Mise à jour</Button>
+                {isLoading ? ( <Button className="ml-4" disabled>Loading...</Button> ) :
+                 ( <Button onClick={fetchChartData} className="ml-4">Update</Button> )}
+
             </div>
-                <HighchartsReact highcharts={Highcharts} options={options} />
-            </figure>
+            {isLoading ? (
+                    <div className="spinner"></div>
+                ) : (
+                    <HighchartsReact highcharts={Highcharts} options={chartOptions} />
+                )}
         </div>
     );
 };
-

@@ -18,72 +18,78 @@ import "./Style.css"
 // Initialize the exporting module
 HighchartsExporting(Highcharts);
 
-export default function GeneratedInteractions({defaultStartDate, defaultEndDate, allForums}) {
-    const [startDate, setStartDate] = useState(defaultStartDate || '');
-    const [endDate, setEndDate] = useState(defaultEndDate || '');
+export default function GeneratedInteractions() {
+    const defaultData = {
+        minDate: "2009-02-12",
+        maxDate: "2009-05-15",
+        forums: [
+            "Tous", "7", "10", "14", "11", "9", "329", "331", "332",
+            "333", "330", "353", "354", "355", "13", "335", "336", "337",
+            "339", "340", "341", "338", "358", "359", "360", "343",
+            "344", "346", "347", "348", "362", "363", "16", "17", "326"
+        ]
+    };
+
+    const [startDate, setStartDate] = useState(defaultData.minDate);
+    const [endDate, setEndDate] = useState(defaultData.maxDate);
     const [forum, setForum] = useState('Tous');
-    const [generated, setGenerated] = useState({});
-    const [forums, setForums] = useState(allForums || []);
+    const [chartData, setChartData] = useState({});
+    const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
-        if (defaultStartDate && defaultEndDate && allForums) {
-            setStartDate(defaultStartDate);
-            setEndDate(defaultEndDate);
-            setForums(allForums);
-            handleGenerated();
-        }
-    }, [defaultStartDate, defaultEndDate, allForums]);
+        setStartDate(defaultData.minDate);
+        setEndDate(defaultData.maxDate);
+        fetchChartData();
+    }, []);
 
-
-
-    const handleGenerated = async () => {
+    const fetchChartData = async () => {
+        setIsLoading(true);
         const queryParams = new URLSearchParams({
             startDate: startDate || '',
             endDate: endDate || '',
-            forum: forum === 'Tous' ? '' : forum, // Set forum to null if "Tous" is selected
+            forum: forum === 'Tous' ? '' : forum,
         }).toString();
 
         try {
-            const response = await fetch(`/api/cmc/generated?${queryParams}`, {
-                method : 'GET',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-              });
+            const response = await fetch(`api/cmc/generated?${queryParams}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
             if (!response.ok) throw new Error(`Server error: ${response.status}`);
             const data = await response.json();
-            setGenerated(data);
+            setChartData(data);
         } catch (error) {
             console.error('Error:', error);
-            setGenerated({ error: "An error occurred while fetching data" });
+            setChartData({ error: "An error occurred while fetching data" });
+        } finally {
+            setIsLoading(false);
         }
     };
 
-
     const processChartData = () => {
-        if (Object.keys(generated).length === 0) return [];
+        if (Object.keys(chartData).length === 0) return [];
 
-        const userPoints = Object.entries(generated).map(([user, dates]) => ({
+        const usersData = Object.entries(chartData).map(([user, timeData]) => ({
             user,
-            totalPoints: Object.values(dates).reduce((sum, points) => sum + points, 0),
-            dates
+            totalTime: Object.values(timeData).reduce((sum, time) => sum + time, 0),
+            timeData
         }));
 
-        const topUsers = userPoints
-            .sort((a, b) => b.totalPoints - a.totalPoints)
+        const topUsers = usersData
+            .sort((a, b) => b.totalTime - a.totalTime)
             .slice(0, 5);
 
         return topUsers.map(user => ({
             name: user.user,
-            data: Object.entries(user.dates).map(([date, points]) => ({
+            data: Object.entries(user.timeData).map(([date, time]) => ({
                 x: new Date(date).getTime(),
-                y: points
+                y: time
             })),
             type: 'line'
         }));
     };
 
-    const options = {
+    const chartOptions = {
         chart: {
             zoomType: 'x',
             type: 'line',
@@ -138,7 +144,7 @@ export default function GeneratedInteractions({defaultStartDate, defaultEndDate,
 
 
     return (
-        <div className="flex flex-col items-center justify-center h-screen">
+        <div >
             
             <figure className="highcharts-figure" style={{ textAlign: 'center', padding: '20px' }}>
                 <h1 className="text-3xl mb-4">Users generated Interactions per day</h1>
@@ -155,7 +161,7 @@ export default function GeneratedInteractions({defaultStartDate, defaultEndDate,
                     <SelectContent>
                         <SelectGroup>
                             <SelectLabel>Forums</SelectLabel>
-                            {forums.map(forumValue => (
+                            {defaultData.forums.map(forumValue => (
                                 <SelectItem key={forumValue} value={forumValue}>
                                     {forumValue}
                                 </SelectItem>
@@ -163,11 +169,17 @@ export default function GeneratedInteractions({defaultStartDate, defaultEndDate,
                         </SelectGroup>
                     </SelectContent>
                 </Select>
-                <Button onClick={handleGenerated} className="ml-4">Mise à jour</Button>
-            </div>
-                <HighchartsReact highcharts={Highcharts} options={options} />
+
+                {isLoading ? ( <Button className="ml-4" disabled>Loading...</Button> ) :
+                 ( <Button onClick={fetchChartData} className="ml-4">Update</Button> )}
+
+                </div>
+            {isLoading ? (
+                    <div className="spinner"></div>
+                ) : (
+                    <HighchartsReact highcharts={Highcharts} options={chartOptions} />
+                )}
             </figure>
         </div>
     );
 };
-
