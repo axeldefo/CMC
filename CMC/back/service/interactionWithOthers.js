@@ -1,15 +1,17 @@
 // Fonction pour calculer le nombre de posts par utilisateur par jour
-exports.countPostsByUser = (users, data) => {
+exports.countPostsByUser = (data) => {
+
     const postCount = {};
+    
 
     data.forEach(item => {
         const operation = item.Operation;
-        const sender = operation.Message.Sender;
+        const sender = operation.User.Name;
         const title = operation.Action.Title;
         const actionDate = new Date(operation.Action.Date).toISOString().split('T')[0]; // Format "YYYY-MM-DD"
 
         // Vérifier si l'utilisateur est dans la liste spécifiée et que l'action correspond à "Poster un nouveau message"
-        if (users.includes(sender) && title === "Poster un nouveau message") {
+        if (title === "Poster un nouveau message") {
             if (!postCount[sender]) {
                 postCount[sender] = {};  // Initialiser l'objet pour l'utilisateur
             }
@@ -24,22 +26,23 @@ exports.countPostsByUser = (users, data) => {
 };
 
 // Fonction pour calculer le nombre de réponses et de citations par utilisateur par jour
-exports.countInteractionsByUser = (users, data) => {
+exports.countInteractionsByUser = (data) => {
+
     const responseCount = {};
 
     data.forEach(item => {
         const operation = item.Operation;
         const user = operation.User.Name;
         const title = operation.Action.Title;
-        const sender = operation.Message.Sender;
+        const sender = operation.Message.Attributes.Parent.Sender;
         const actionDate = new Date(operation.Action.Date).toISOString().split('T')[0]; // Format "YYYY-MM-DD"
 
         // Vérifier si l'utilisateur est dans la liste et si le titre correspond
-        if (users.includes(user) && 
-            (title === "Repondre a un message" || 
+        if ((title === "Repondre a un message" || 
              title === "Citer un message" || 
              title === "Afficher le fil de discussion" || 
-             title === "Download un fichier dans le message")) {
+             title === "Afficher le contenu d'un message" ||
+             title === "Download un fichier dans le message") && sender !== user) {
             // S'assurer que l'utilisateur n'est pas l'expéditeur
             if (user !== sender) {
                 if (!responseCount[user]) {
@@ -57,22 +60,23 @@ exports.countInteractionsByUser = (users, data) => {
 };
 
 // Fonction pour calculer la pluralité des auteurs uniques avec lesquels un utilisateur répond ou cite par jour
-exports.countUniqueAuthorsUserInteractedWith = (users, data) => {
+exports.countUniqueAuthorsUserInteractedWith = (data) => {
+
     const authorsCount = {};
 
     data.forEach(item => {
         const operation = item.Operation;
         const user = operation.User.Name;
         const title = operation.Action.Title;
-        const sender = operation.Message.Sender;
+        const sender = operation.Message.Attributes.Parent.Sender;
         const actionDate = new Date(operation.Action.Date).toISOString().split('T')[0]; // Format "YYYY-MM-DD"
 
         // Vérifier si l'utilisateur est dans la liste et si le titre correspond
-        if (users.includes(user) && 
-            (title === "Repondre a un message" || 
+        if ((title === "Repondre a un message" || 
              title === "Citer un message" || 
              title === "Afficher le fil de discussion" || 
-             title === "Download un fichier dans le message")) {
+             title === "Afficher le contenu d'un message" ||
+             title === "Download un fichier dans le message") && sender !== user) {
             // S'assurer que l'utilisateur n'est pas l'expéditeur
             if (user !== sender && sender) {
                 if (!authorsCount[user]) {
@@ -99,19 +103,21 @@ exports.countUniqueAuthorsUserInteractedWith = (users, data) => {
 };
 
 // Fonction pour compter les réponses ou citations immédiatement après la lecture d'un message par utilisateur par jour
-exports.countResponseAfterReading = (users, data) => {
+exports.countResponseAfterReading = (data) => {
+
     let responseCountsByDay = {};
 
     data.forEach(item => {
         const operation = item.Operation;
         const user = operation.User.Name;
+        const sender = operation.Message.Attributes.Parent.Sender;
         const title = operation.Action.Title;
         const refTran = operation.Action.RefTran;
         const messageId = operation.Message.id;
 
         // Vérifier si l'utilisateur est dans la liste et que l'action est une lecture
-        if (users.includes(user) && (title === "Afficher le contenu d'un message" || title === "Bouger la ScrollBar")) {
-            if (refTran === 0 && title === "Afficher le contenu d'un message") {
+        if ((title === "Afficher le contenu d'un message" || title === "Bouger la ScrollBar") && sender !== user) {
+            if (title === "Afficher le contenu d'un message") {
                 const readingDate = new Date(operation.Action.Date);
                 const readingTimeInSeconds = readingDate.getTime() / 1000; // Convertir l'heure en secondes
 
@@ -123,12 +129,12 @@ exports.countResponseAfterReading = (users, data) => {
 
                 if (nextAction) {
                     const nextTitle = nextAction.Operation.Action.Title;
-                    const parentMessageId = nextAction.Operation.Message.Attributes.idParent;
+                    const nextParentMessageId = nextAction.Operation.Message.Attributes.Parent.id;
                     const nextActionDate = new Date(nextAction.Operation.Action.Date).toISOString().split('T')[0]; // Date au format YYYY-MM-DD
 
                     // Vérifier si la prochaine action est une réponse ou citation du même message
                     if ((nextTitle === "Repondre a un message" || nextTitle === "Citer un message") &&
-                        parentMessageId === messageId) {
+                        nextParentMessageId === messageId) {
 
                         if (!responseCountsByDay[user]) responseCountsByDay[user] = {};
                         if (!responseCountsByDay[user][nextActionDate]) responseCountsByDay[user][nextActionDate] = 0;
@@ -157,12 +163,13 @@ exports.countResponseAfterReading = (users, data) => {
 
                 if (nextAction) {
                     const nextTitle = nextAction.Operation.Action.Title;
-                    const parentMessageId = nextAction.Operation.Message.Attributes.idParent;
+                    const nextParentMessageId = nextAction.Operation.Message.Attributes.Parent.id;
                     const nextActionDate = new Date(nextAction.Operation.Action.Date).toISOString().split('T')[0]; // Date au format YYYY-MM-DD
+                
 
                     // Vérifier si la prochaine action est une réponse ou citation du même message
                     if ((nextTitle === "Repondre a un message" || nextTitle === "Citer un message") &&
-                        parentMessageId === messageId) {
+                        nextParentMessageId === messageId) {
 
                         if (!responseCountsByDay[user]) responseCountsByDay[user] = {};
                         if (!responseCountsByDay[user][nextActionDate]) responseCountsByDay[user][nextActionDate] = 0;

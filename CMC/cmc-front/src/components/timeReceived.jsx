@@ -138,38 +138,45 @@ export default function TimeSpentByUser() {
     };
 
     return (
-        <div className="flex flex-col items-center justify-center h-screen" >
-            <h1 className="text-3xl mb-4">Time Received by Users on Writing/Reading</h1>
-            <div className="flex items-center mb-4">
-                <label htmlFor="startDate" className="mr-2">Start Date:</label>
-                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-                <label htmlFor="endDate" className="ml-4 mr-2">End Date:</label>
-                <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-                <label htmlFor="forum" className="ml-4 mr-2">Forum:</label>
-                <Select value={forum} onValueChange={setForum} className="w-[180px]">
-                    <SelectTrigger>
-                        <SelectValue placeholder="Select a forum" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectGroup>
-                            <SelectLabel>Forums</SelectLabel>
-                            {defaultData.forums.map(f => (
-                                <SelectItem key={f} value={f}>
-                                    {f}
-                                </SelectItem>
-                            ))}
-                        </SelectGroup>
-                    </SelectContent>
-                </Select>
-                {isLoading ? ( <Button className="ml-4" disabled>Loading...</Button> ) :
-                 ( <Button onClick={fetchChartData} className="ml-4">Update</Button> )}
+        <div className="flex flex-col items-center justify-center h-screen">
+            <figure className="highcharts-figure" style={{ textAlign: 'center', padding: '20px' }}>
+                <h1 className="text-3xl mb-4">Time Received by Users on Writing/Reading</h1>
+                <div className="flex items-center mb-4">
+                    <label className="mr-2">Start Date:</label>
+                    <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
 
-            </div>
-            {isLoading ? (
+                    <label className="ml-4 mr-2">End Date:</label>
+                    <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+
+                    <label className="ml-4 mr-2">Forum:</label>
+                    <Select value={forum} onValueChange={setForum} className="w-[180px]">
+                        <SelectTrigger>
+                            <SelectValue placeholder="Select a forum" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectGroup>
+                                <SelectLabel>Forums</SelectLabel>
+                                {defaultData.forums.map(f => (
+                                    <SelectItem key={f} value={f}>
+                                        {f}
+                                    </SelectItem>
+                                ))}
+                            </SelectGroup>
+                        </SelectContent>
+                    </Select>
+
+                    {isLoading ? ( <Button className="ml-4" disabled>Loading...</Button> ) :
+                 ( <Button onClick={fetchChartData} className="ml-4">Update</Button> )}
+                </div>
+
+                {isLoading ? (
                     <div className="spinner"></div>
                 ) : (
                     <HighchartsReact highcharts={Highcharts} options={chartOptions} />
                 )}
+
+
+            </figure>
         </div>
     );
 };

@@ -1,29 +1,27 @@
-const { use } = require("../route/cmcRoute");
 
 // Fonction pour calculer le temps de rédaction par utilisateur par jour
-exports.calculateWritingTimeByUser = (users, data) => {
+exports.calculateWritingTimeByUser = (data) => {
 
     const writingTimes = {};
 
     data.forEach(item => {
         const operation = item.Operation;
         const user = operation.User.Name;
+        const parentSender = operation.Message.Attributes.Parent.Sender;
         const actionTitle = operation.Action.Title;
-        const delay = operation.Action.Delai;
+        const delayInSeconds = operation.Action.Delai ? parseTimeToSeconds(operation.Action.Delai) : 0;
         const actionDate = new Date(operation.Action.Date).toISOString().split('T')[0]; // Format "YYYY-MM-DD"
 
-        if (users.includes(user) && ["Repondre a un message", "Poster un nouveau message", "Citer un message"].includes(actionTitle)) {
-            if (delay) {
-                const delayInSeconds = parseTimeToSeconds(delay);
+        if (["Repondre a un message", "Poster un nouveau message"].includes(actionTitle) && user !== parentSender) {
 
-                if (!writingTimes[user]) {
-                    writingTimes[user] = {};
-                }
-                if (!writingTimes[user][actionDate]) {
-                    writingTimes[user][actionDate] = 0;
-                }
-                writingTimes[user][actionDate] += delayInSeconds; // Add delay in seconds for the user per day
+            if (!writingTimes[user]) {
+                writingTimes[user] = {};
             }
+            if (!writingTimes[user][actionDate]) {
+                writingTimes[user][actionDate] = 0;
+            }
+            writingTimes[user][actionDate] += delayInSeconds; // Add delay in seconds for the user per day
+
         }
     });
 
@@ -31,29 +29,27 @@ exports.calculateWritingTimeByUser = (users, data) => {
 };
 
 // Fonction pour calculer le temps de lecture par utilisateur par jour
-exports.calculateReadingTimeByUser = (users, data) => {
+exports.calculateReadingTimeByUser = (data) => {
 
     const readingTimes = {};
 
     data.forEach(item => {
         const operation = item.Operation;
         const user = operation.User.Name;
+        const parentSender = operation.Message.Attributes.Parent.Sender;
         const title = operation.Action.Title;
-        const delay = operation.Action.Delai;
+        const delay = operation.Action.Delai ? parseTimeToSeconds(operation.Action.Delai) : 0;
         const actionDate = new Date(operation.Action.Date).toISOString().split('T')[0]; // Format "YYYY-MM-DD"
 
-        if (users.includes(user) && (title === "Afficher le fil de discussion" || title === "Afficher le contenu d'un message")) {
-            if (delay) {
-                const timeInSeconds = parseTimeToSeconds(delay);
+        if ((title === "Afficher le fil de discussion" || title === "Afficher le contenu d'un message") && user !== parentSender) {
 
-                if (!readingTimes[user]) {
-                    readingTimes[user] = {};
-                }
-                if (!readingTimes[user][actionDate]) {
-                    readingTimes[user][actionDate] = 0;
-                }
-                readingTimes[user][actionDate] += timeInSeconds; // Add reading time for the user per day
+            if (!readingTimes[user]) {
+                readingTimes[user] = {};
             }
+            if (!readingTimes[user][actionDate]) {
+                readingTimes[user][actionDate] = 0;
+            }
+            readingTimes[user][actionDate] += delay; // Add reading time for the user per day
         }
     });
 
@@ -61,45 +57,45 @@ exports.calculateReadingTimeByUser = (users, data) => {
 };
 
 // Fonction pour calculer le temps de scroll par utilisateur par jour
-exports.calculateScrollTimeByUser = (users, data) => {
+exports.calculateScrollTimeByUser = (data) => {
     const scrollTimes = {};
     const processedRefTran = new Set(); // Set pour stocker les RefTran déjà traités
 
     data.forEach(item => {
         const operation = item.Operation;
         const user = operation.User.Name;
+        const parentSender = operation.Message.Attributes.Parent.Sender;
         const title = operation.Action.Title;
         const refTran = operation.Action.RefTran;
         const actionDate = new Date(operation.Action.Date).toLocaleDateString('en-CA'); // Format "YYYY-MM-DD"
 
         // Vérifier que l'utilisateur est dans la liste des utilisateurs spécifiés
-        if (users.includes(user) && title === "Bouger la ScrollBar") {
-            // Vérifier si le RefTran a déjà été traité
-            if (!processedRefTran.has(refTran)) {
-                // Récupérer toutes les opérations ayant le même RefTran pour le même utilisateur
-                const relatedOperations = data.filter(op => 
-                    op.Operation.Action.RefTran === refTran && 
-                    op.Operation.User.Name === user
-                );
+        if (title.includes("Bouger la ScrollBar") && user !== parentSender && !processedRefTran.has(refTran)) {
 
-                // Trouver la date de début et de fin pour ces opérations
-                const dateDebut = Math.min(...relatedOperations.map(op => new Date(op.Operation.Action.Date).getTime()));
-                const dateFin = Math.max(...relatedOperations.map(op => new Date(op.Operation.Action.Date).getTime()));
-                const scrollTimeInSeconds = (dateFin - dateDebut) / 1000;
+            // Récupérer toutes les opérations ayant le même RefTran pour le même utilisateur
+            const relatedOperations = data.filter(op =>
+                op.Operation.Action.RefTran === refTran &&
+                op.Operation.User.Name === user
+            );
 
-                // Initialiser l'objet utilisateur et la date si nécessaires
-                if (!scrollTimes[user]) {
-                    scrollTimes[user] = {};
-                }
-                if (!scrollTimes[user][actionDate]) {
-                    scrollTimes[user][actionDate] = 0;
-                }
-                // Ajouter le temps de scroll pour l'utilisateur par jour
-                scrollTimes[user][actionDate] += scrollTimeInSeconds;
+            // Trouver la date de début et de fin pour ces opérations
+            const dateDebut = Math.min(...relatedOperations.map(op => new Date(op.Operation.Action.Date).getTime()));
+            const dateFin = Math.max(...relatedOperations.map(op => new Date(op.Operation.Action.Date).getTime()));
+            const scrollTimeInSeconds = (dateFin - dateDebut) / 1000;
 
-                // Ajouter le RefTran au Set pour indiquer qu'il a été traité
-                processedRefTran.add(refTran);
+            // Initialiser l'objet utilisateur et la date si nécessaires
+            if (!scrollTimes[user]) {
+                scrollTimes[user] = {};
             }
+            if (!scrollTimes[user][actionDate]) {
+                scrollTimes[user][actionDate] = 0;
+            }
+            // Ajouter le temps de scroll pour l'utilisateur par jour
+            scrollTimes[user][actionDate] += scrollTimeInSeconds;
+
+            // Ajouter le RefTran au Set pour indiquer qu'il a été traité
+            processedRefTran.add(refTran);
+
         }
     });
 
@@ -108,7 +104,7 @@ exports.calculateScrollTimeByUser = (users, data) => {
 
 
 // Fonction pour calculer le temps entre la lecture et la réponse par utilisateur par jour
-exports.timeBetweenReadingAndResponding = (users, data) => {
+exports.timeBetweenReadingAndResponding = (data) => {
     let responseTimesByDay = {};
     const processedRefTran = new Set(); // Set pour éviter de traiter plusieurs fois le même RefTran
 
@@ -117,32 +113,33 @@ exports.timeBetweenReadingAndResponding = (users, data) => {
         const user = operation.User.Name;
         const title = operation.Action.Title;
         const refTran = operation.Action.RefTran;
-        const messageId = operation.Message.id;
+        const messageId = operation.Message.Attributes.Parent.id;
         const delai = operation.Action.Delai;
+        const delayInSeconds = operation.Action.Delai? parseTimeToSeconds(delai) : 0;
+        const parentSender = operation.Message.Attributes.Parent.Sender;
 
         // Vérifier si l'utilisateur est dans la liste et que l'action est une lecture
-        if (users.includes(user) && (title === "Afficher le contenu d'un message" || title === "Bouger la ScrollBar")) {
+        if ((title === "Afficher le contenu d'un message" || title === "Bouger la ScrollBar")) {
             // Cas où l'action est un affichage de contenu
             if (refTran === 0 && title === "Afficher le contenu d'un message") {
                 const readingDate = new Date(operation.Action.Date);
                 const readingTimeInSeconds = readingDate.getTime() / 1000; // Convertir l'heure en secondes
-                const delayInSeconds = delai ? parseTimeToSeconds(delai) : 0; // Convertir le délai en secondes
                 const endReadingTime = readingTimeInSeconds + delayInSeconds;
 
                 // Trouver la prochaine action après la lecture
-                const nextAction = data.find(op => 
+                const nextAction = data.find(op =>
                     op.Operation.User.Name === user &&
                     new Date(op.Operation.Action.Date).getTime() / 1000 > endReadingTime
                 );
 
                 if (nextAction) {
                     const nextTitle = nextAction.Operation.Action.Title;
-                    const parentMessageId = nextAction.Operation.Message.Attributes.idParent;
+                    const nextParentMessageId = nextAction.Operation.Message.Attributes.Parent.id;
                     const nextActionDate = new Date(nextAction.Operation.Action.Date).toLocaleDateString('en-CA');
 
                     // Vérifier si c'est une réponse ou citation pour le même message
                     if ((nextTitle === "Repondre a un message" || nextTitle === "Citer un message") &&
-                        parentMessageId === messageId) {
+                        nextParentMessageId === messageId && parentSender !== user) {
 
                         const responseTimeInSeconds = (new Date(nextAction.Operation.Action.Date).getTime() / 1000) - endReadingTime;
 
@@ -155,12 +152,11 @@ exports.timeBetweenReadingAndResponding = (users, data) => {
             }
 
             // Cas où l'action est un défilement (scroll)
-            if (refTran !== 0 && title === "Bouger la ScrollBar") {
+            if (refTran !== 0 && title === "Bouger la ScrollBar" && !processedRefTran.has(refTran)) {
                 // Récupérer toutes les opérations ayant le même RefTran pour le même utilisateur
-                const relatedOperations = data.filter(op => 
-                    op.Operation.Action.RefTran === refTran && 
-                    op.Operation.User.Name === user &&
-                    op.Operation.Message.id === messageId
+                const relatedOperations = data.filter(op =>
+                    op.Operation.Action.RefTran === refTran &&
+                    op.Operation.User.Name === user 
                 );
 
                 // Trouver la date et l'heure de la dernière action de lecture (scroll)
@@ -171,24 +167,24 @@ exports.timeBetweenReadingAndResponding = (users, data) => {
 
                 // Calculer la date de fin avec le délai, si présent
                 let endReadingTime = latestReadingActionTime;
-                if (delai) {
-                    endReadingTime += parseTimeToSeconds(delai); // Ajouter le délai à l'heure de la lecture
+                if (delayInSeconds) {
+                    endReadingTime += delayInSeconds; // Ajouter le délai à l'heure de la lecture
                 }
 
                 // Trouver la prochaine action après le défilement
-                const nextAction = data.find(op => 
+                const nextAction = data.find(op =>
                     op.Operation.User.Name === user &&
                     parseTimeToSeconds(op.Operation.Action.Date.split(' ')[1]) > endReadingTime
                 );
 
                 if (nextAction) {
                     const nextTitle = nextAction.Operation.Action.Title;
-                    const parentMessageId = nextAction.Operation.Message.Attributes.idParent;
+                    const nextParentMessageId = nextAction.Operation.Message.Attributes.Parent.id;
                     const nextActionDate = new Date(nextAction.Operation.Action.Date).toLocaleDateString('en-CA');
 
                     // Vérifier si c'est une réponse ou citation pour le même message
                     if ((nextTitle === "Repondre a un message" || nextTitle === "Citer un message") &&
-                        parentMessageId === messageId) {
+                        nextParentMessageId === messageId && parentSender !== user) {
 
                         const responseTimeInSeconds = parseTimeToSeconds(nextAction.Operation.Action.Date.split(' ')[1]) - endReadingTime;
 

@@ -12,8 +12,8 @@ const parseDate = (dateStr) => new Date(dateStr);
 // Fonction pour calculer les points correspondant aux interactions générées par user par jour sur une période donnée
 exports.calculatePointsForGeneratedInteractions = (users, data, dateList) => {
 
-    const interactionsData = countInteractionsAndDownloadsForUser(users, data);  // Appeler avec la liste des utilisateurs
-    const uniqueInteractorsData = countUniqueInteractorsForUsersAsSender(users, data);  // Appeler avec la liste des utilisateurs
+    const interactionsData = countInteractionsAndDownloadsForUser(data);  // Appeler avec la liste des utilisateurs
+    const uniqueInteractorsData = countUniqueInteractorsForUsersAsSender(data);  // Appeler avec la liste des utilisateurs
 
     const result = {};
 
@@ -30,7 +30,7 @@ exports.calculatePointsForGeneratedInteractions = (users, data, dateList) => {
             const downloadsCount = interactionsData[user][date].downloadsCount || 0;
             const uniqueInteractorsCount = uniqueInteractorsData[user][date] || 0;
 
-            // Calculer les points pour cette date d'interactions (1 point par interaction, 3 points par téléchargement, 1 point par interlocuteur unique)
+            // Calculer les points pour cette date d'interactions (1 point par interaction, 1 points par téléchargement, 1 point par interlocuteur unique)
             const totalPoints = interactionsCount + downloadsCount + uniqueInteractorsCount;
 
             // Stocker les points par date
@@ -46,10 +46,10 @@ exports.calculatePointsForGeneratedInteractions = (users, data, dateList) => {
 exports.calculatePointsForInteractionsWithOthers = (users, data, dateList) => {
 
     // Appeler les fonctions en passant la liste complète des utilisateurs
-    const postsData = countPostsByUser(users, data);
-    const uniqueAuthorsData = countUniqueAuthorsUserInteractedWith(users, data);
-    const responseData = countInteractionsByUser(users, data);
-    const responseAfterReadingData = countResponseAfterReading(users, data);
+    const postsData = countPostsByUser(data);
+    const uniqueAuthorsData = countUniqueAuthorsUserInteractedWith(data);
+    const responseData = countInteractionsByUser(data);
+    const responseAfterReadingData = countResponseAfterReading(data);
     
     const result = {};
 
@@ -84,18 +84,31 @@ exports.calculatePointsForInteractionsWithOthers = (users, data, dateList) => {
 exports.calculatePointsForTimeSpent = (users, data, dateList) => {
 
     // Calculer les temps d'écriture, de lecture et de scroll pour tous les utilisateurs
-    const writingTimes = calculateWritingTimeByUser(users, data);
-    const readingTimes = calculateReadingTimeByUser(users, data);
-    const scrollTimes = calculateScrollTimeByUser(users, data);
-    const timeBetweenReadingAndRespondingData = timeBetweenReadingAndResponding(users, data);
+    const writingTimes = calculateWritingTimeByUser(data);
+    const readingTimes = calculateReadingTimeByUser(data);
+    const scrollTimes = calculateScrollTimeByUser(data);
+    const timeBetweenReadingAndRespondingData = timeBetweenReadingAndResponding(data);
 
-    // Calculer la limite pour la comparaison du temps entre la lecture et la réponse
-    const limitTimeBetweenReadingAndResponding = 1000;
+    // fixer la limite pour la comparaison du temps entre la lecture et la réponse à 5 minutes
+    const limitTimeBetweenReadingAndResponding = 300;
+
+    // Calculer la moyenne globale sur toute la durée
+    const totalWritingTime = Object.values(writingTimes).reduce((sum, times) => {
+        return sum + Object.values(times).reduce((a, b) => a + (b || 0), 0);
+    }, 0);
+
+    const totalReadingTime = Object.values(readingTimes).reduce((sum, times) => {
+        return sum + Object.values(times).reduce((a, b) => a + (b || 0), 0);
+    }, 0);
+
+    const totalScrollTime = Object.values(scrollTimes).reduce((sum, times) => {
+        return sum + Object.values(times).reduce((a, b) => a + (b || 0), 0);
+    }, 0);
 
     const totalUsers = users.length;
-    const avgWritingTime = totalUsers ? Object.values(writingTimes).flat().reduce((sum, times) => sum + times, 0) / totalUsers : 0;
-    const avgReadingTime = totalUsers ? Object.values(readingTimes).flat().reduce((sum, times) => sum + times, 0) / totalUsers : 0;
-    const avgScrollTime = totalUsers ? Object.values(scrollTimes).flat().reduce((sum, times) => sum + times, 0) / totalUsers : 0;
+    const avgWritingTime = totalUsers ? totalWritingTime / totalUsers/ dateList.length : 0;
+    const avgReadingTime = totalUsers ? totalReadingTime / totalUsers/ dateList.length : 0;
+    const avgScrollTime = totalUsers ? totalScrollTime / totalUsers/ dateList.length : 0;
 
     // Calculer les points pour chaque utilisateur par jour
     const userPoints = {};
@@ -105,9 +118,9 @@ exports.calculatePointsForTimeSpent = (users, data, dateList) => {
         dateList.forEach(date => {
             userPoints[user][date] = 0; // Initialiser les points à 0 pour chaque date
 
-            const userWritingTime = writingTimes[user]?.[date] || 0;
-            const userReadingTime = readingTimes[user]?.[date] || 0;
-            const userScrollTime = scrollTimes[user]?.[date] || 0;
+            const userWritingTime = Math.min(writingTimes[user]?.[date] || 0, 2 * avgWritingTime);
+            const userReadingTime = Math.min(readingTimes[user]?.[date] || 0, 2 * avgReadingTime);
+            const userScrollTime = Math.min(scrollTimes[user]?.[date] || 0, 2 * avgScrollTime);
             const userTimeBetweenReadingAndResponding = timeBetweenReadingAndRespondingData[user]?.[date] || 0;
 
             // Calcul des points pour le temps de rédaction (1 point pour chaque 10% de plus que la moyenne)
@@ -142,9 +155,9 @@ exports.calculatePointsForTimeSpent = (users, data, dateList) => {
 exports.calculatePointsForTimeReceived = (users, data, dateList) => {
 
     // Calculer les temps de rédaction, lecture et scroll reçus pour tous les utilisateurs
-    const writingTimes = calculateWritingTimeByOthersForUser(users, data);
-    const readingTimes = calculateReadingTimeReceivedByUser(users, data);
-    const scrollTimes = calculateScrollTimeReceivedByUser(users, data);
+    const writingTimes = calculateWritingTimeByOthersForUser(data);
+    const readingTimes = calculateReadingTimeReceivedByUser(data);
+    const scrollTimes = calculateScrollTimeReceivedByUser(data);
 
     // Calculer la moyenne globale sur toute la durée
     const totalWritingTime = Object.values(writingTimes).reduce((sum, times) => {
@@ -160,9 +173,10 @@ exports.calculatePointsForTimeReceived = (users, data, dateList) => {
     }, 0);
 
     const totalUsers = users.length;
-    const avgWritingTime = totalUsers ? totalWritingTime / totalUsers : 0;
-    const avgReadingTime = totalUsers ? totalReadingTime / totalUsers : 0;
-    const avgScrollTime = totalUsers ? totalScrollTime / totalUsers : 0;
+    const avgWritingTime = totalUsers ? totalWritingTime / totalUsers/ dateList.length : 0;
+    const avgReadingTime = totalUsers ? totalReadingTime / totalUsers/ dateList.length : 0;
+    const avgScrollTime = totalUsers ? totalScrollTime / totalUsers/ dateList.length : 0;
+
 
     // Calculer les points pour chaque utilisateur par jour
     const userPoints = {};
@@ -172,9 +186,9 @@ exports.calculatePointsForTimeReceived = (users, data, dateList) => {
         dateList.forEach(date => {  
             userPoints[user][date] = 0; // Initialiser les points à 0 pour chaque date
 
-            const userWritingTime = writingTimes[user]?.[date] || 0;
-            const userReadingTime = readingTimes[user]?.[date] || 0;
-            const userScrollTime = scrollTimes[user]?.[date] || 0;
+            const userWritingTime = Math.min(writingTimes[user]?.[date] || 0, 2 * avgWritingTime);
+            const userReadingTime = Math.min(readingTimes[user]?.[date] || 0, 2 * avgReadingTime);
+            const userScrollTime = Math.min(scrollTimes[user]?.[date] || 0, 2 * avgScrollTime);
 
             // Calcul des points pour le temps de rédaction reçu (1 point pour chaque 10% de plus que la moyenne)
             if (userWritingTime > avgWritingTime) {

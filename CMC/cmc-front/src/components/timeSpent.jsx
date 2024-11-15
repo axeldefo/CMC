@@ -178,5 +178,7 @@ export default function TimeSpent() {
 
             </figure>
         </div>
+
+        
     );
 }

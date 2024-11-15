@@ -15,7 +15,6 @@ exports.getDefault = async (req, res) => {
 exports.getTotal = async (req, res) => {
     try {
         const { startDate, endDate, forum } = req.query;
-        console.log(startDate, endDate, forum);
         const points = cmcService.totalPoints(startDate, endDate, forum);
         res.status(200).json(points);
         
@@ -59,7 +58,6 @@ exports.getTimeSpent = async (req, res) => {
         res.status(200).json(points);
         
     } catch (error) {
-        console.log(error);
         res.status(500).send(error.message);
     }
 }
